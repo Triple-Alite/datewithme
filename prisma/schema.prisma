@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String?
+  isAdmin      Boolean      @default(false)
+  invitations  Invitation[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Invitation {
+  id              String    @id @default(cuid())
+  slug            String    @unique @default(cuid())
+  inviterName     String
+  recipientName   String
+  message         String
+  email           String?
+  feeEnabled      Boolean   @default(false)
+  feeAmountKobo   Int       @default(0)
+  active          Boolean   @default(true)
+  inviterId       String?
+  inviter         User?     @relation(fields: [inviterId], references: [id], onDelete: SetNull)
+  booking         Booking?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([inviterId, createdAt])
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  invitationId   String        @unique
+  invitation     Invitation    @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  dateTime       DateTime
+  meal           String
+  note           String?
+  status         BookingStatus @default(PENDING)
+  payment        Payment?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  bookingId          String        @unique
+  booking            Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reference          String        @unique
+  amountKobo         Int
+  status             PaymentStatus @default(PENDING)
+  paystackTransactionId String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
