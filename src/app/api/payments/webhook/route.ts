@@ -29,7 +29,17 @@ export async function POST(request: Request) {
   if (event.event === "charge.success" && typeof event.data?.reference === "string" && (typeof event.data.id === "number" || typeof event.data.id === "string")) {
     const payment = await prisma.payment.findUnique({
       where: { reference: event.data.reference },
-      include: { booking: { include: { invitation: { include: { inviter: { select: { email: true } } } } } },
+      include: {
+        booking: {
+          include: {
+            invitation: {
+              include: {
+                inviter: { select: { email: true } },
+              },
+            },
+          },
+        },
+      },
     });
     if (payment && event.data.amount === payment.amountKobo && event.data.currency === "NGN") {
       const claimed = await prisma.$transaction(async (transaction) => {
