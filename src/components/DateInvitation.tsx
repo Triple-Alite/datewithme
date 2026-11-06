@@ -39,7 +39,7 @@ type AccountFields = z.infer<typeof accountSchema>;
 
 export default function DateInvitation({ invitationSlug }: Props) {
   const [invitation, setInvitation] = useState(demoInvitation);
-  const [step, setStep] = useState<"invite" | "yes" | "schedule" | "meal" | "payment" | "complete" | "declined">("invite");
+  const [step, setStep] = useState<"invite" | "yes" | "schedule" | "meal" | "payment" | "complete" | "declined" | "declined-final">("invite");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [invitationLoading, setInvitationLoading] = useState(Boolean(invitationSlug));
   const [invitationError, setInvitationError] = useState("");
@@ -147,7 +147,7 @@ export default function DateInvitation({ invitationSlug }: Props) {
         <div className="experience-copy">
           <div className="eyebrow"><span className="eyebrow-line" /> A LITTLE NOTE FOR {invitation.recipientName.toUpperCase()} <span className="eyebrow-line" /></div>
 
-          {step !== "invite" && step !== "declined" && <div className="progress-track" aria-label={`Step ${Math.max(stepIndex, 0) + 1} of 5`}><span style={{ width: `${Math.min(100, Math.max(12, (stepIndex / 5) * 100))}%` }} /></div>}
+          {step !== "invite" && step !== "declined" && step !== "declined-final" && <div className="progress-track" aria-label={`Step ${Math.max(stepIndex, 0) + 1} of 5`}><span style={{ width: `${Math.min(100, Math.max(12, (stepIndex / 5) * 100))}%` }} /></div>}
 
           <AnimatePresence mode="wait">
             <motion.div key={step} className="step-content" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
@@ -164,10 +164,20 @@ export default function DateInvitation({ invitationSlug }: Props) {
 
               {step === "declined" && <>
                 <span className="tiny-heart tiny-heart-soft"><Heart size={17} /></span>
+                <p className="overline">A PLOT TWIST</p>
+                <h1>Oof, my rom-com<br /><em>just became a solo.</em></h1>
+                <p className="note-intro">{noCount > 1 ? "Still a no? Got it. No pressure, ever." : "Your answer is totally okay. My imaginary tuxedo is going back on its hanger."}</p>
+                <div className="choice-row">
+                  <button className="button button-primary" onClick={() => setStep("yes")}>Actually, yes! <Heart size={16} fill="currentColor" /></button>
+                  <button className="button button-quiet" onClick={() => setStep("declined-final")}>Still no, thanks</button>
+                </div>
+              </>}
+
+              {step === "declined-final" && <>
+                <span className="tiny-heart tiny-heart-soft"><Heart size={17} /></span>
+                <p className="overline">NO PRESSURE, EVER</p>
                 <h1>Thanks for<br /><em>being honest.</em></h1>
-                <p className="note-intro">No pressure, {invitation.recipientName}. Your answer is completely okay.</p>
-                <button className="text-action" onClick={() => setStep("invite")}>Take another look <ArrowRight size={15} /></button>
-                {noCount > 1 && <p className="small-note">This is a no-pressure zone. Promise.</p>}
+                <p className="note-intro">No date planning, no guilt, just good vibes. Take care, {invitation.recipientName}.</p>
               </>}
 
               {step === "yes" && <>
