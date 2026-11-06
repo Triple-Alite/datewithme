@@ -18,6 +18,7 @@ export async function POST(request: Request) {
 
   const invitation = await prisma.invitation.findUnique({ where: { slug: parsed.data.slug, active: true } });
   if (!invitation) return NextResponse.json({ error: "This invitation is no longer available." }, { status: 404 });
+  if (invitation.response !== "ACCEPTED") return NextResponse.json({ error: "Please accept the invitation before planning the date." }, { status: 409 });
   const existingBooking = await prisma.booking.findUnique({ where: { invitationId: invitation.id } });
   if (existingBooking) return NextResponse.json({ error: "A booking has already been made for this invitation." }, { status: 409 });
 

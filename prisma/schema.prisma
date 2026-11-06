@@ -28,6 +28,7 @@ model Invitation {
   feeEnabled      Boolean   @default(false)
   feeAmountKobo   Int       @default(0)
   active          Boolean   @default(true)
+  response        InvitationResponse @default(PENDING)
   inviterId       String?
   inviter         User?     @relation(fields: [inviterId], references: [id], onDelete: SetNull)
   booking         Booking?
@@ -72,4 +73,10 @@ enum PaymentStatus {
   PENDING
   SUCCESS
   FAILED
+}
+
+enum InvitationResponse {
+  PENDING
+  ACCEPTED
+  DECLINED
 }

@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Copy, Heart, LockKeyhole, Mail, Sparkles, Utensils, X } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEffect, useMemo, useState } from "react";
@@ -13,6 +14,7 @@ type InvitationData = {
   message: string;
   feeEnabled: boolean;
   feeAmountKobo: number;
+  response: "PENDING" | "ACCEPTED" | "DECLINED";
   booking?: { id: string; status: string; dateTime: string; meal: string } | null;
 };
 
@@ -24,6 +26,7 @@ const demoInvitation: InvitationData = {
   message: "I've been meaning to ask you something...",
   feeEnabled: false,
   feeAmountKobo: 0,
+  response: "PENDING",
 };
 
 const meals = [
@@ -39,6 +42,7 @@ type AccountFields = z.infer<typeof accountSchema>;
 
 export default function DateInvitation({ invitationSlug }: Props) {
   const [invitation, setInvitation] = useState(demoInvitation);
+  const router = useRouter();
   const [step, setStep] = useState<"invite" | "yes" | "schedule" | "meal" | "payment" | "complete" | "declined" | "declined-final">("invite");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [invitationLoading, setInvitationLoading] = useState(Boolean(invitationSlug));
@@ -59,12 +63,18 @@ export default function DateInvitation({ invitationSlug }: Props) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "This invitation is not available.");
         setInvitation(data);
-        const query = new URLSearchParams(window.location.search);
-        if (query.get("booking") === "confirmed" && data.booking?.status === "CONFIRMED") {
+        if (data.booking) {
           const bookedDate = new Date(data.booking.dateTime);
           setDate(bookedDate.toISOString().slice(0, 10));
           setTime(bookedDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).toLowerCase());
           setMeal(data.booking.meal);
+          setBookingId(data.booking.id);
+          setStep(data.booking.status === "CONFIRMED" ? "complete" : "payment");
+        } else if (data.response === "ACCEPTED") {
+          setStep("yes");
+        }
+        const query = new URLSearchParams(window.location.search);
+        if (query.get("booking") === "confirmed" && data.booking?.status === "CONFIRMED") {
           setStep("complete");
         }
         if (query.get("payment") === "failed") {
@@ -84,6 +94,30 @@ export default function DateInvitation({ invitationSlug }: Props) {
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().slice(0, 10);
   }, []);
+
+  async function respond(response: "ACCEPTED" | "DECLINED", nextStep: "yes" | "declined") {
+    setError("");
+    if (invitationSlug) {
+      setBusy(true);
+      try {
+        const result = await fetch(`/api/invitations/${encodeURIComponent(invitationSlug)}/response`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ response }),
+        });
+        const data = await result.json();
+        if (!result.ok) throw new Error(data.error ?? "Your response could not be saved.");
+        setInvitation((current) => ({ ...current, response: data.response }));
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Your response could not be saved.");
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+    if (response === "DECLINED") setNoCount((value) => value + 1);
+    setStep(nextStep);
+  }
 
   async function saveBooking() {
     if (!invitationSlug) {
@@ -157,8 +191,8 @@ export default function DateInvitation({ invitationSlug }: Props) {
                 <p className="note-intro">{invitation.message}</p>
                 <p className="from-line">with love, <span>{invitation.inviterName}</span></p>
                 <div className="choice-row">
-                  <button className="button button-primary" onClick={() => setStep("yes")}>Yes, absolutely <Heart size={16} fill="currentColor" /></button>
-                  <button className="button button-quiet" onClick={() => { setNoCount((value) => value + 1); setStep("declined"); }}>No, thank you</button>
+                  <button className="button button-primary" disabled={busy} onClick={() => respond("ACCEPTED", "yes")}>Yes, absolutely <Heart size={16} fill="currentColor" /></button>
+                  <button className="button button-quiet" disabled={busy} onClick={() => respond("DECLINED", "declined")}>No, thank you</button>
                 </div>
               </>}
 
@@ -168,7 +202,7 @@ export default function DateInvitation({ invitationSlug }: Props) {
                 <h1>Oof, my rom-com<br /><em>just became a solo.</em></h1>
                 <p className="note-intro">{noCount > 1 ? "Still a no? Got it. No pressure, ever." : "Your answer is totally okay. My imaginary tuxedo is going back on its hanger."}</p>
                 <div className="choice-row">
-                  <button className="button button-primary" onClick={() => setStep("yes")}>Actually, yes! <Heart size={16} fill="currentColor" /></button>
+                  <button className="button button-primary" disabled={busy} onClick={() => respond("ACCEPTED", "yes")}>Actually, yes! <Heart size={16} fill="currentColor" /></button>
                   <button className="button button-quiet" onClick={() => setStep("declined-final")}>Still no, thanks</button>
                 </div>
               </>}
@@ -258,6 +292,7 @@ function convertTime(value: string) {
 }
 
 function CreatorModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
   const [mode, setMode] = useState<"register" | "login">("register");
   const [form, setForm] = useState({ name: "", recipientName: "", recipientEmail: "", message: "I've been meaning to ask you something...", feeEnabled: false, feeAmountNaira: 2500 });
   const [createdUrl, setCreatedUrl] = useState("");
@@ -278,11 +313,16 @@ function CreatorModal({ onClose }: { onClose: () => void }) {
       if (!sessionReady) {
         const authResponse = await fetch(`/api/auth/${mode === "register" ? "register" : "login"}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: form.name, email: credentials.email, password: credentials.password }),
+          body: JSON.stringify({ name: mode === "register" ? form.name : undefined, email: credentials.email, password: credentials.password }),
         });
         const authData = await authResponse.json();
         if (!authResponse.ok) throw new Error(authData.error ?? "We couldn't sign you in.");
         setSessionReady(true);
+      }
+      if (mode === "login") {
+        onClose();
+        router.push("/dashboard");
+        return;
       }
       const response = await fetch("/api/invitations", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -309,23 +349,24 @@ function CreatorModal({ onClose }: { onClose: () => void }) {
         <button className="modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
         {!createdUrl ? <>
           <span className="modal-kicker">A NOTE, JUST FOR THEM</span>
-          <h2 id="creator-heading">Make it <em>personal.</em></h2>
+          <h2 id="creator-heading">{mode === "login" ? <>Welcome <em>back.</em></> : <>Make it <em>personal.</em></>}</h2>
           <div className="auth-switch"><button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Create account</button><button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Sign in</button></div>
           <form onSubmit={accountForm.handleSubmit(submit)} className="creator-form">
             {mode === "register" && <label>Your name<input required value={form.name} onChange={(event) => update("name", event.target.value)} placeholder="The brave one" maxLength={80} /></label>}
-            {mode === "login" && <label>Your name for the invite<input required value={form.name} onChange={(event) => update("name", event.target.value)} placeholder="Your first name" maxLength={80} /></label>}
             <label>Email address<input required type="email" {...accountForm.register("email")} placeholder="you@example.com" maxLength={254} /></label>
             {accountForm.formState.errors.email && <p className="error-message">Enter a valid email address.</p>}
             <label>Password<input required type="password" {...accountForm.register("password")} placeholder="At least 12 characters" minLength={12} maxLength={128} /></label>
             {accountForm.formState.errors.password && <p className="error-message">Use at least 12 characters.</p>}
-            <div className="form-divider"><span>YOUR INVITATION</span></div>
-            <label>Their name<input required value={form.recipientName} onChange={(event) => update("recipientName", event.target.value)} placeholder="Who is the lucky one?" maxLength={80} /></label>
-            <label>Their email <span className="optional-label">optional</span><input type="email" value={form.recipientEmail} onChange={(event) => update("recipientEmail", event.target.value)} placeholder="For a little surprise in their inbox" maxLength={254} /></label>
-            <label>Your note<textarea required value={form.message} onChange={(event) => update("message", event.target.value)} rows={2} maxLength={500} /></label>
-            <label className="fee-toggle"><span><strong>Add a reservation fee</strong><small>Optional and clearly shown to your guest</small></span><input type="checkbox" checked={form.feeEnabled} onChange={(event) => update("feeEnabled", event.target.checked)} /></label>
-            {form.feeEnabled && <label>Reservation fee in naira<input type="number" min={100} max={100000} step={100} value={form.feeAmountNaira} onChange={(event) => update("feeAmountNaira", Number(event.target.value))} /></label>}
+            {mode === "register" && <>
+              <div className="form-divider"><span>YOUR INVITATION</span></div>
+              <label>Their name<input required value={form.recipientName} onChange={(event) => update("recipientName", event.target.value)} placeholder="Who is the lucky one?" maxLength={80} /></label>
+              <label>Their email <span className="optional-label">optional</span><input type="email" value={form.recipientEmail} onChange={(event) => update("recipientEmail", event.target.value)} placeholder="For a little surprise in their inbox" maxLength={254} /></label>
+              <label>Your note<textarea required value={form.message} onChange={(event) => update("message", event.target.value)} rows={2} maxLength={500} /></label>
+              <label className="fee-toggle"><span><strong>Add a reservation fee</strong><small>Optional and clearly shown to your guest</small></span><input type="checkbox" checked={form.feeEnabled} onChange={(event) => update("feeEnabled", event.target.checked)} /></label>
+              {form.feeEnabled && <label>Reservation fee in naira<input type="number" min={100} max={100000} step={100} value={form.feeAmountNaira} onChange={(event) => update("feeAmountNaira", Number(event.target.value))} /></label>}
+            </>}
             {error && <p className="error-message" role="alert">{error}</p>}
-            <button className="button button-primary full-button" disabled={busy}>{busy ? "Making your invitation..." : "Create my invitation"} <ArrowRight size={16} /></button>
+            <button className="button button-primary full-button" disabled={busy}>{busy ? (mode === "login" ? "Signing in..." : "Making your invitation...") : (mode === "login" ? "Sign in" : "Create account & invitation")} <ArrowRight size={16} /></button>
           </form>
         </> : <div className="link-created">
           <span className="completion-icon"><Check size={24} /></span>

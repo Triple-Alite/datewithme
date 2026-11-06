@@ -23,9 +23,10 @@ export default async function DashboardPage() {
         <p className="dashboard-subtitle">{user?.email}</p>
         <div className="dashboard-toolbar"><h2>Your invitations <span>{invitations.length}</span></h2><a className="dashboard-create" href="/">+ New invitation</a></div>
         {invitations.length ? <div className="invitation-table">
-          <div className="table-head"><span>INVITATION</span><span>CREATED</span><span>DATE STATUS</span><span>LINK</span></div>
+          <div className="table-head"><span>INVITATION</span><span>RESPONSE</span><span>CREATED</span><span>DATE STATUS</span><span>LINK</span></div>
           {invitations.map((invitation) => <div className="table-row" key={invitation.id}>
             <div className="table-person"><strong>{invitation.recipientName}</strong><small>{invitation.feeEnabled ? `Fee · ₦${(invitation.feeAmountKobo / 100).toLocaleString()}` : "No reservation fee"}</small></div>
+            <span className={`response-pill response-${invitation.response.toLowerCase()}`}>{invitation.response === "ACCEPTED" ? "Said yes" : invitation.response === "DECLINED" ? "Said no" : "Awaiting reply"}</span>
             <span className="table-date">{invitation.createdAt.toLocaleDateString()}</span>
             <span className={`status-pill ${invitation.booking?.status === "CONFIRMED" ? "confirmed" : "waiting"}`}>{invitation.booking?.status === "CONFIRMED" ? "Confirmed" : invitation.booking ? "Awaiting payment" : "Awaiting reply"}</span>
             <a className="table-link" href={`/invite/${invitation.slug}`} target="_blank" rel="noreferrer">Open <span>↗</span></a>
