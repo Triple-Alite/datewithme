@@ -16,7 +16,7 @@ The home page is a working sample invitation. Creating a personalized link requi
 
 - Paystack: configure `PAYSTACK_SECRET_KEY`, then register `/api/payments/webhook` in the Paystack dashboard. Use test keys before enabling live charges. The amount is stored and checked in kobo on both verification paths.
 - Gmail SMTP: enable 2-Step Verification on the sending Google account, create an App Password, then set `SMTP_USER`, `SMTP_APP_PASSWORD`, and `EMAIL_FROM` in `.env`. Keep the SMTP credentials server-side and never use the normal Google account password. The default settings use `smtp.gmail.com` on port `465` with TLS. Email delivery is best-effort and does not undo a saved booking.
-- Deployment: deploy the Next.js app to Vercel, use a managed PostgreSQL URL (Neon or Supabase), and set every variable from `.env.example` in the deployment environment. Never expose the Paystack secret or `AUTH_SECRET` to the browser.
+- Deployment: deploy the Next.js app to Vercel, use a managed PostgreSQL URL (Neon or Supabase), and set every variable from `.env.example` in the deployment environment. The production build runs `prisma migrate deploy` before building Next.js. Never expose the Paystack secret or `AUTH_SECRET` to the browser.
 
 Personal Gmail is suitable for low-volume testing and personal use, but Google applies sending limits that can vary by account and may restrict automated sending. It is not a bulk or guaranteed transactional email service; use a dedicated mail provider when delivery volume or reliability becomes important.
 
