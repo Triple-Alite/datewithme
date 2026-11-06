@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAppOrigin } from "@/lib/app-origin";
 
 const schema = z.object({ bookingId: z.string().min(1), email: z.string().email().max(254) });
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const origin = getAppOrigin(request);
   try {
     const response = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",

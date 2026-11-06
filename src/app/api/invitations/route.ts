@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { escapeHtml, sendEmail } from "@/lib/email";
+import { getAppOrigin } from "@/lib/app-origin";
 
 const schema = z.object({
   inviterName: z.string().trim().min(1).max(80),
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     select: { slug: true, recipientName: true },
   });
 
-  const url = `${process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin}/invite/${invitation.slug}`;
+  const url = `${getAppOrigin(request)}/invite/${invitation.slug}`;
   if (data.email) {
     await sendEmail({
       to: data.email,
